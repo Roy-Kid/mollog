@@ -2,23 +2,22 @@
 
 ## 1.0.0
 
-`mollog` 1.0.0 is the first stable release.
+Release date: 2026-04-12
 
-### Included in this release
+First stable release.
 
-- thread-safe logger and manager operations
-- optional `RichHandler` with lazy import behavior
-- `exc_info`, `stack_info`, and `logger.exception(...)`
-- context-local structured fields via `contextvars`
-- `configure()` and `shutdown()` helpers
-- stronger packaging metadata and release assets
-- Zensical documentation site
-- GitHub Actions for tests, docs, build validation, and release publishing
+### What's included
 
-### Suggested release sequence
+- Thread-safe logger and manager operations
+- `configure()` and `shutdown()` helpers for application lifecycle
+- Structured `extra` fields and `bind()` for reusable logger context
+- Context-local fields via `contextvars`: `bind_context()`, `scoped_context()`, `reset_context()`
+- Exception and stack capture: `exc_info=`, `stack_info=`, `logger.exception(...)`
+- `TextFormatter` and `JSONFormatter`
+- `StreamHandler`, `FileHandler`, `RotatingFileHandler`, `TimedRotatingFileHandler`, `QueueHandler`, `NullHandler`
+- `QueueListener` with drain window on shutdown
+- Optional `RichHandler` behind `molcrafts-mollog[rich]`
 
-1. Ensure the CI workflow is green.
-2. Build artifacts locally or from CI.
-3. Tag the release as `v1.0.0`.
-4. Publish a GitHub release.
-5. Let the publish workflow upload the distribution to PyPI once trusted publishing is configured.
+### Breaking changes
+
+None — this is the initial stable release.

@@ -1,56 +1,40 @@
 # mollog
 
-Small, typed, dependency-free logging for Python applications that need structured output without hauling in a full observability stack.
+Zero-dependency structured logging for Python applications that need clear output, a small surface area, and explicit control.
 
 [Get started](getting-started.md){ .md-button .md-button--primary }
 [API reference](api.md){ .md-button }
 
 ## What it gives you
 
-- Named loggers with propagation and hierarchy support
+- Named loggers with hierarchy and propagation
 - Structured `extra` fields and reusable context via `bind()`
+- Context-local fields for async and request-scoped flows via `contextvars`
 - Exception and stack capture on every record
-- Context-local structured fields for async and request-scoped flows
 - Text and JSON formatters
 - Stream, file, rotating-file, timed-rotating, queue, and null handlers
 - Optional Rich console output for local tooling and CLIs
-- Queue listeners for thread and multiprocessing pipelines
+- `configure()` and `shutdown()` helpers for application lifecycle
 - No runtime dependencies
 
-## Design goals
+## Quick example
 
-### Minimal surface area
+```python
+from mollog import JSONFormatter, StreamHandler, configure, get_logger
 
-`mollog` stays close to the standard Python logging mental model, but removes a lot of ceremony:
+handler = StreamHandler()
+handler.set_formatter(JSONFormatter())
+configure(level="info", handlers=[handler])
 
-- logger construction is explicit
-- handlers are small and composable
-- records are immutable dataclasses
-- structured context is first-class instead of bolted on
+logger = get_logger("api")
+logger.info("request complete", status=200, duration_ms=18)
+```
 
-### Predictable behavior
+## Documentation map
 
-Recent hardening work focused on the edges that tend to turn into production bugs:
-
-- logger and manager mutation are guarded for concurrent access
-- formatter reserved keys cannot overwrite core record fields
-- queue listener shutdown drains late-arriving records for a short grace window
-- rotating handlers validate invalid values up front
-- optional `RichHandler` integrates without forcing `rich` into core installs
-- top-level `configure()` and `shutdown()` cover common app lifecycle setup
-
-## Typical use cases
-
-- CLI tools that need human-readable stderr output
-- services that want newline-delimited JSON logs
-- worker pools that centralize writes through a queue
-- scientific or data-processing pipelines that carry rich contextual metadata
-
-## Next steps
-
-- Follow the [getting started guide](getting-started.md) for setup and examples.
-- Read [configuration](configuration.md) for root logger setup and teardown.
-- Read [context propagation](context.md) for request or task scoped metadata.
-- Check [Rich console logging](rich.md) if you want colored terminal output.
-- Read [behavior and guarantees](behavior.md) for important runtime semantics.
-- Browse the [API reference](api.md) for the exported surface.
+- [Getting Started](getting-started.md) — installation, setup, common patterns
+- [Configuration](configuration.md) — root logger setup and teardown
+- [Context Propagation](context.md) — request and task scoped metadata
+- [Behavior](behavior.md) — concurrency, reserved fields, shutdown semantics
+- [Rich Console](rich.md) — colored terminal output
+- [API Reference](api.md) — complete exported surface
