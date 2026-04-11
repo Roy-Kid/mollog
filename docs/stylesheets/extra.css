@@ -1,0 +1,38 @@
+:root {
+  --mollog-hero-gradient: linear-gradient(135deg, rgba(13, 148, 136, 0.12), rgba(245, 158, 11, 0.12));
+}
+
+.md-typeset h1 {
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+.md-typeset h2,
+.md-typeset h3 {
+  letter-spacing: -0.02em;
+}
+
+.md-main__inner {
+  margin-top: 1rem;
+}
+
+.md-content__inner > h1:first-child {
+  padding: 1rem 1.25rem 0.2rem;
+  margin-bottom: 0.75rem;
+  background: var(--mollog-hero-gradient);
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 1rem;
+}
+
+.md-typeset .md-button {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.md-typeset code {
+  border-radius: 0.4rem;
+}
+
+.md-grid {
+  max-width: 1320px;
+}

@@ -1,0 +1,10 @@
+graft src
+graft tests
+graft docs
+
+include README.md
+include CHANGELOG.md
+include LICENSE
+include zensical.toml
+
+global-exclude __pycache__ *.py[cod]

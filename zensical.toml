@@ -1,0 +1,54 @@
+[project]
+site_name = "mollog"
+site_url = "https://github.com/MolCrafts/mollog/tree/master/docs"
+site_description = "Zero-dependency structured logging for Python services, scripts, and background workers."
+site_author = "Roy Kid"
+copyright = "&copy; 2026 Roy Kid"
+docs_dir = "docs"
+site_dir = "site"
+repo_url = "https://github.com/MolCrafts/mollog"
+repo_name = "MolCrafts/mollog"
+edit_uri = "edit/master/docs/"
+extra_css = ["stylesheets/extra.css"]
+nav = [
+  {"Overview" = "index.md"},
+  {"Guide" = [
+    "getting-started.md",
+    "configuration.md",
+    "context.md",
+    "behavior.md",
+    "rich.md"
+  ]},
+  {"Reference" = [
+    "api.md",
+    "release-notes.md"
+  ]}
+]
+
+[project.theme]
+variant = "modern"
+language = "en"
+font.text = "IBM Plex Sans"
+font.code = "IBM Plex Mono"
+features = [
+  "navigation.tabs",
+  "navigation.sections",
+  "navigation.expand",
+  "navigation.path",
+  "navigation.top",
+  "toc.follow",
+  "content.action.edit",
+  "content.action.view",
+]
+
+[project.theme.palette]
+scheme = "default"
+primary = "teal"
+accent = "amber"
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+edit = "material/pencil"
+view = "material/eye"
+
+[project.markdown_extensions.attr_list]

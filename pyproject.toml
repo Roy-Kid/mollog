@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "molcrafts-mollog"
+version = "1.0.0"
+description = "Zero-dependency structured logging library for the molcrafts ecosystem"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+authors = [
+  { name = "Roy Kid" }
+]
+keywords = ["logging", "structured-logging", "python", "json", "molcrafts"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: System :: Logging",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/MolCrafts/mollog"
+Documentation = "https://github.com/MolCrafts/mollog/tree/master/docs"
+Repository = "https://github.com/MolCrafts/mollog"
+Issues = "https://github.com/MolCrafts/mollog/issues"
+Changelog = "https://github.com/MolCrafts/mollog/blob/master/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.11"]
+docs = ["zensical>=0.0.32"]
+rich = ["rich>=13"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mollog*"]
+
+[tool.setuptools.package-data]
+mollog = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
