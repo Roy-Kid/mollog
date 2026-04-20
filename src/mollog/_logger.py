@@ -164,18 +164,45 @@ class Logger:
         level: Level | str | int = Level.INFO,
         **extra: Any,
     ) -> None:
-        """Forward an event to logfire, bypassing mollog's Handler pipeline.
+        """Dispatch an event *only* to attached :class:`LogfireHandler` instances.
 
-        Requires :func:`mollog.configure_logfire` to have been called first.
-        Merges the current :class:`Context`, the logger's bound fields, and
-        *extra* (later sources win) and passes them as logfire attributes.
+        Walks the logger chain (respecting ``propagate``) and calls every
+        ``LogfireHandler`` it finds; records never reach other handler
+        types via this path, so ``logger.fire`` stays a dedicated logfire
+        channel. Raises :class:`RuntimeError` if no ``LogfireHandler`` is
+        attached.
         """
 
-        from mollog import _logfire
+        from mollog._logfire import LogfireHandler
 
         resolved = Level.coerce(level)
-        attributes = self._merged_extra(extra or None)
-        _logfire.fire(resolved, message, attributes, logger_name=self.name)
+        record = LogRecord(
+            level=resolved,
+            message=message,
+            logger_name=self.name,
+            extra=self._merged_extra(extra or None),
+        )
+
+        delivered = 0
+        current: Logger | None = self
+        while current is not None:
+            with current._lock:
+                handlers = tuple(current.handlers)
+                parent = current.parent
+                propagate = current.propagate
+            for handler in handlers:
+                if isinstance(handler, LogfireHandler):
+                    handler.handle(record)
+                    delivered += 1
+            if not propagate:
+                break
+            current = parent
+
+        if delivered == 0:
+            raise RuntimeError(
+                "logger.fire() needs at least one LogfireHandler attached; "
+                "call logger.add_handler(LogfireHandler()) first"
+            )
 
     def bind(self, **extra: Any) -> Logger:
         """Return a view of this logger with additional persistent fields.

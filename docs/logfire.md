@@ -23,8 +23,7 @@ mollog.configure_logfire(
 )
 ```
 
-Pass `send_to_logfire=False` to run offline (the logfire console exporter
-will still produce output, but nothing is uploaded):
+Pass `send_to_logfire=False` to run offline:
 
 ```python
 mollog.configure_logfire(token=None, send_to_logfire=False, service_name="dev")
@@ -32,24 +31,45 @@ mollog.configure_logfire(token=None, send_to_logfire=False, service_name="dev")
 
 Any other keyword you pass is forwarded verbatim to `logfire.configure`.
 
-## Emitting events with `logger.fire`
+## Attaching `LogfireHandler`
 
-`logger.fire(...)` is a dedicated channel that forwards an event to
-logfire only — it does **not** produce a `LogRecord` and does not go
-through any mollog `Handler`. Use `logger.info` / `logger.debug` / etc.
-for your local logs, and `logger.fire` when you specifically want an
-event on logfire:
+Logfire is exposed as a regular `Handler`. To route records to logfire,
+attach a `LogfireHandler` to the relevant logger (typically the root, so
+every child logger inherits it via propagation):
+
+```python
+import mollog
+
+mollog.configure_logfire(token="...")
+root = mollog.get_logger("")
+root.add_handler(mollog.LogfireHandler())
+
+logger = mollog.get_logger("api")
+logger.info("served")            # stderr (default handler) + logfire
+logger.warning("slow query", ms=2300)
+```
+
+`LogfireHandler.emit` calls `logfire.log(level, message, attributes=extra)`.
+If `configure_logfire` has not been called, emit raises `RuntimeError`;
+if the `logfire` package is not installed, it raises `ImportError`.
+
+## `logger.fire` — logfire-only dispatch
+
+`logger.fire(message, *, level=Level.INFO, **extra)` dispatches the
+record **only** to `LogfireHandler` instances on the logger chain,
+bypassing every other handler. Use it when you want an event to reach
+logfire but not your local stderr/file sinks:
 
 ```python
 logger = mollog.get_logger("api")
 
-logger.info("served locally")                       # mollog only
-logger.fire("shipped to logfire", status=200)       # logfire only
-logger.fire("warning", level="warning", code=42)    # custom level
+logger.info("served locally")                       # mollog + logfire
+logger.fire("shipped to logfire only", status=200)  # logfire only
+logger.fire("warning event", level="warning", code=42)
 ```
 
-`Logger.fire` raises `RuntimeError` if `configure_logfire` has not been
-called, and `ImportError` if the `logfire` package is not installed.
+`logger.fire(...)` raises `RuntimeError` if no `LogfireHandler` is
+reachable via the logger's chain (self + ancestors honoring `propagate`).
 
 ## Spans via `Context.scope`
 
@@ -74,10 +94,11 @@ in any environment.
 
 ## Merge order
 
-A single `logger.fire(...)` attribute map is built as:
+A single event's attribute map is built as:
 
 1. `Context.get()` (current `Context.bind` / `scope` fields)
 2. `Logger.bind(...)` fields
-3. keyword arguments passed to `logger.fire(...)`
+3. keyword arguments passed to `logger.fire(...)` / `logger.info(...)`
 
-Later sources win.
+Later sources win. `LogfireHandler` adds `logger_name` automatically if
+the record has one.

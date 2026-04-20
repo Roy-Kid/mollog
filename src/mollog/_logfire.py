@@ -1,6 +1,7 @@
 """Optional :mod:`logfire` backend.
 
-Activated by :func:`mollog.configure_logfire`. Only this module imports
+Activated by :func:`mollog.configure_logfire` + attaching a
+:class:`LogfireHandler` to a logger. Only this module imports
 ``logfire``; the rest of mollog keeps logfire as a soft dependency.
 
 No environment variables are read. All configuration must flow through
@@ -12,7 +13,9 @@ from __future__ import annotations
 from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
+from mollog._handler import Handler
 from mollog._level import Level
+from mollog._record import LogRecord
 
 try:  # pragma: no cover - exercised via import fallback in tests
     import logfire as _logfire_mod
@@ -45,10 +48,9 @@ def configure_logfire(
 ) -> None:
     """Configure the logfire backend.
 
-    This is a thin wrapper around :func:`logfire.configure` that refuses
-    to rely on environment variables: every setting must be passed as a
-    keyword argument to this function. Pass ``send_to_logfire=False`` to
-    run offline (local console exporter only).
+    Thin wrapper around :func:`logfire.configure` that refuses to rely on
+    environment variables — every setting must be passed as a keyword
+    argument. Pass ``send_to_logfire=False`` to run offline.
     """
 
     if _logfire_mod is None:
@@ -70,24 +72,34 @@ def is_configured() -> bool:
     return _CONFIGURED
 
 
-def fire(
-    level: Level,
-    message: str,
-    attributes: dict[str, Any],
-    *,
-    logger_name: str = "",
-) -> None:
-    """Send an event to logfire. Raises if logfire is unavailable/unconfigured."""
+class LogfireHandler(Handler):
+    """Forward log records to :mod:`logfire`.
 
-    if _logfire_mod is None:
-        raise ImportError(_INSTALL_HINT)
-    if not _CONFIGURED:
-        raise RuntimeError(_UNCONFIGURED_HINT)
+    Attach with ``logger.add_handler(LogfireHandler())``. Requires
+    :func:`configure_logfire` to have been called first. When attached,
+    every record dispatched to the logger (``logger.info`` etc.) also
+    reaches logfire. :meth:`Logger.fire` additionally routes records
+    *only* through ``LogfireHandler`` instances, bypassing other
+    handlers on the logger chain.
+    """
 
-    payload = dict(attributes)
-    if logger_name:
-        payload.setdefault("logger_name", logger_name)
-    _logfire_mod.log(_LEVEL_MAP[level], message, attributes=payload)
+    def __init__(self, level: Level = Level.TRACE) -> None:
+        super().__init__(level)
+
+    def emit(self, record: LogRecord) -> None:
+        if _logfire_mod is None:
+            raise ImportError(_INSTALL_HINT)
+        if not _CONFIGURED:
+            raise RuntimeError(_UNCONFIGURED_HINT)
+
+        attributes = dict(record.extra)
+        if record.logger_name:
+            attributes.setdefault("logger_name", record.logger_name)
+        _logfire_mod.log(
+            _LEVEL_MAP[record.level],
+            record.message,
+            attributes=attributes,
+        )
 
 
 def open_span(name: str, attributes: dict[str, Any]) -> AbstractContextManager[Any]:
