@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Literal
 
 from mollog._record import LogRecord
+from mollog._stdlib_bridge import mollog_to_stdlib_level
 
 _RESERVED_FIELDS = {"timestamp", "level", "logger_name", "message", "exception", "stack_info"}
 
@@ -90,14 +91,9 @@ class StdlibStyleFormatter(Formatter):
         datefmt: str | None = None,
         style: Literal["%", "{", "$"] = "%",
     ) -> None:
-        self._fmt = fmt
-        self._datefmt = datefmt
-        self._style = style
         self._formatter = _stdlib.Formatter(fmt=fmt, datefmt=datefmt, style=style)
 
     def format(self, record: LogRecord) -> str:
-        from mollog._stdlib_bridge import mollog_to_stdlib_level
-
         std = _stdlib.LogRecord(
             name=record.logger_name,
             level=mollog_to_stdlib_level(record.level),
@@ -110,9 +106,10 @@ class StdlibStyleFormatter(Formatter):
         std.created = record.timestamp.timestamp()
         std.msecs = (std.created - int(std.created)) * 1000.0
         std.levelname = str(record.level)
+        std_attrs = std.__dict__
         for key, value in record.extra.items():
-            if not hasattr(std, key):
-                setattr(std, key, value)
+            if key not in std_attrs:
+                std_attrs[key] = value
         if record.exception:
             std.exc_text = record.exception
         if record.stack_info:

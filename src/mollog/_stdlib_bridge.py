@@ -87,14 +87,21 @@ _RESERVED_STDLIB_ATTRS = frozenset(
 )
 
 
+_EMPTY_EXTRAS: dict[str, Any] = {}
+
+
 def _stdlib_record_extras(record: _stdlib.LogRecord) -> dict[str, Any]:
     """Extract user-set extras from a stdlib record.
 
     Stdlib's ``extra=`` kwarg attaches arbitrary keys directly to the
     record. We forward anything that isn't a known stdlib attribute so
-    structured fields survive the bridge.
+    structured fields survive the bridge. The common case — libraries
+    logging without ``extra=`` — short-circuits to a shared empty dict
+    to avoid one allocation per record on the hot path.
     """
 
+    if record.__dict__.keys() <= _RESERVED_STDLIB_ATTRS:
+        return _EMPTY_EXTRAS
     return {
         key: value
         for key, value in record.__dict__.items()
@@ -118,6 +125,7 @@ class StdlibBridgeHandler(_stdlib.Handler):
 
     def emit(self, record: _stdlib.LogRecord) -> None:  # noqa: D401 - stdlib API
         # Lazy import to avoid a circular dependency at module load time.
+        from mollog._logger import _format_exception
         from mollog._manager import LoggerManager
         from mollog._record import LogRecord as _MolRecord
 
@@ -132,34 +140,26 @@ class StdlibBridgeHandler(_stdlib.Handler):
             except Exception:  # pragma: no cover - defensive: bad % args
                 message = str(record.msg)
 
-            extras = _stdlib_record_extras(record)
-            timestamp = datetime.fromtimestamp(record.created, tz=timezone.utc)
-
-            exception = self.format_exception(record)
-            stack_info = record.stack_info if record.stack_info else None
+            exc_info = record.exc_info
+            # Stdlib widens exc_info to (None, None, None); coerce to a
+            # real triple (or None) before handing off to mollog's helper.
+            if exc_info is None or exc_info[0] is None:
+                exc_for_mollog = None
+            else:
+                exc_for_mollog = exc_info  # type: ignore[assignment]
 
             mol_record = _MolRecord(
                 level=level,
                 message=message,
                 logger_name=record.name,
-                timestamp=timestamp,
-                extra=extras,
-                exception=exception,
-                stack_info=stack_info,
+                timestamp=datetime.fromtimestamp(record.created, tz=timezone.utc),
+                extra=_stdlib_record_extras(record),
+                exception=_format_exception(exc_for_mollog),
+                stack_info=record.stack_info if record.stack_info else None,
             )
             mollog_logger._dispatch(mol_record)
         except Exception:  # pragma: no cover
             self.handleError(record)
-
-    @staticmethod
-    def format_exception(record: _stdlib.LogRecord) -> str | None:
-        """Render ``record.exc_info`` into a string, if present."""
-
-        if not record.exc_info:
-            return None
-        import traceback
-
-        return "".join(traceback.format_exception(*record.exc_info)).rstrip()
 
 
 def capture_stdlib_logging(

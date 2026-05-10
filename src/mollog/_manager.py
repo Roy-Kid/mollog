@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 import threading
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import IO, Any
 
@@ -61,7 +61,14 @@ class LoggerManager:
             return logger
 
     def ensure_default_handler(self) -> None:
-        """Add a default StreamHandler to root if it has none."""
+        """Add a default StreamHandler to root if it has none.
+
+        Hot path — every ``mollog.info(...)``-style call goes through here
+        via ``get_logger("")``. The fast path avoids the lock once the
+        manager has been configured.
+        """
+        if self._configured:
+            return
         with self._state_lock:
             if not self._configured and not self._root.handlers:
                 handler = StreamHandler(stream=sys.stderr, level=Level.INFO)
@@ -264,64 +271,37 @@ def set_level(level: Level | str | int) -> None:
     get_logger("").set_level(level)
 
 
-def trace(
-    message: str,
-    *,
-    exc_info: ExcInfoArg = None,
-    stack_info: bool = False,
-    **extra: Any,
-) -> None:
-    get_logger("").trace(message, exc_info=exc_info, stack_info=stack_info, **extra)
+def _root_proxy(level_name: str) -> Callable[..., None]:
+    """Build a module-level helper that forwards to ``get_logger("").<level_name>``.
+
+    Stdlib-flavored helpers (``mollog.info(...)`` etc.) all share the same
+    body — generate them from a single template instead of hand-writing
+    six near-identical wrappers.
+    """
+
+    def _impl(
+        message: str,
+        *,
+        exc_info: ExcInfoArg = None,
+        stack_info: bool = False,
+        **extra: Any,
+    ) -> None:
+        getattr(get_logger(""), level_name)(
+            message, exc_info=exc_info, stack_info=stack_info, **extra
+        )
+
+    _impl.__name__ = level_name
+    _impl.__qualname__ = level_name
+    _impl.__doc__ = f"Log *message* at {level_name.upper()} on the root logger."
+    return _impl
 
 
-def debug(
-    message: str,
-    *,
-    exc_info: ExcInfoArg = None,
-    stack_info: bool = False,
-    **extra: Any,
-) -> None:
-    get_logger("").debug(message, exc_info=exc_info, stack_info=stack_info, **extra)
-
-
-def info(
-    message: str,
-    *,
-    exc_info: ExcInfoArg = None,
-    stack_info: bool = False,
-    **extra: Any,
-) -> None:
-    get_logger("").info(message, exc_info=exc_info, stack_info=stack_info, **extra)
-
-
-def warning(
-    message: str,
-    *,
-    exc_info: ExcInfoArg = None,
-    stack_info: bool = False,
-    **extra: Any,
-) -> None:
-    get_logger("").warning(message, exc_info=exc_info, stack_info=stack_info, **extra)
-
-
-def error(
-    message: str,
-    *,
-    exc_info: ExcInfoArg = None,
-    stack_info: bool = False,
-    **extra: Any,
-) -> None:
-    get_logger("").error(message, exc_info=exc_info, stack_info=stack_info, **extra)
-
-
-def critical(
-    message: str,
-    *,
-    exc_info: ExcInfoArg = None,
-    stack_info: bool = False,
-    **extra: Any,
-) -> None:
-    get_logger("").critical(message, exc_info=exc_info, stack_info=stack_info, **extra)
+trace = _root_proxy("trace")
+debug = _root_proxy("debug")
+info = _root_proxy("info")
+warning = _root_proxy("warning")
+error = _root_proxy("error")
+critical = _root_proxy("critical")
 
 
 def exception(message: str, **extra: Any) -> None:
