@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1 - 2026-05-10
+
+### Performance
+- Tightened hot paths in `_formatter.py`, `_manager.py`, and `_stdlib_bridge.py`: `mollog.info(...)` and other root-logger helpers no longer acquire a lock on every call once the manager has been configured; `_stdlib_record_extras` short-circuits to a shared empty dict when no user fields are attached to a stdlib record; `StdlibStyleFormatter.format` writes user extras through `record.__dict__` directly instead of a per-attr `hasattr` lookup; collapsed the six near-identical `trace`/`debug`/.../`critical` module-level wrappers into a `_root_proxy` factory. No public API or behavior changes.
+
 ## 1.2.0 - 2026-05-10
 
 ### Added
