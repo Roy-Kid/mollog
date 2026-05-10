@@ -1,4 +1,5 @@
 import json
+import logging as _stdlib
 from abc import ABC, abstractmethod
 
 from mollog.record import LogRecord
@@ -71,6 +72,51 @@ class JSONFormatter(Formatter):
         if record.stack_info:
             data["stack_info"] = record.stack_info
         return json.dumps(data, ensure_ascii=False, default=str)
+
+
+class StdlibStyleFormatter(Formatter):
+    """Formatter that accepts stdlib :mod:`logging` ``%(asctime)s``-style format strings.
+
+    Drop-in for users migrating from :func:`logging.basicConfig`. The
+    full set of stdlib placeholders is supported because formatting
+    delegates to :class:`logging.Formatter` after translating mollog's
+    :class:`LogRecord` into a stdlib :class:`logging.LogRecord`.
+    """
+
+    def __init__(
+        self,
+        fmt: str,
+        datefmt: str | None = None,
+        style: str = "%",
+    ) -> None:
+        self._fmt = fmt
+        self._datefmt = datefmt
+        self._style = style
+        self._formatter = _stdlib.Formatter(fmt=fmt, datefmt=datefmt, style=style)
+
+    def format(self, record: LogRecord) -> str:
+        from mollog.stdlib_bridge import mollog_to_stdlib_level
+
+        std = _stdlib.LogRecord(
+            name=record.logger_name,
+            level=mollog_to_stdlib_level(record.level),
+            pathname="",
+            lineno=0,
+            msg=record.message,
+            args=(),
+            exc_info=None,
+        )
+        std.created = record.timestamp.timestamp()
+        std.msecs = (std.created - int(std.created)) * 1000.0
+        std.levelname = str(record.level)
+        for key, value in record.extra.items():
+            if not hasattr(std, key):
+                setattr(std, key, value)
+        if record.exception:
+            std.exc_text = record.exception
+        if record.stack_info:
+            std.stack_info = record.stack_info
+        return self._formatter.format(std)
 
 
 def _normalize_extra_fields(extra: dict[str, object]) -> dict[str, object]:

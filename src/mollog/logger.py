@@ -52,6 +52,26 @@ class Logger:
     def is_enabled_for(self, level: Level) -> bool:
         return level >= self.level
 
+    def set_level(self, level: Level | str | int) -> None:
+        """Set this logger's minimum level, accepting names or stdlib ints.
+
+        Also propagates to ``logging.getLogger(self.name).setLevel(...)``
+        so that records emitted through stdlib (via the
+        :class:`mollog.StdlibBridgeHandler` or otherwise) are dropped at
+        the stdlib boundary too — this is what makes
+        ``mollog.get_logger("httpx").set_level("WARNING")`` silence
+        httpx noise without ever importing :mod:`logging`.
+        """
+
+        from mollog.stdlib_bridge import mollog_to_stdlib_level
+
+        resolved = Level.coerce(level)
+        self.level = resolved
+
+        import logging as _stdlib
+
+        _stdlib.getLogger(self.name).setLevel(mollog_to_stdlib_level(resolved))
+
     def _log(
         self,
         level: Level,
@@ -156,6 +176,18 @@ class Logger:
     def close(self) -> None:
         self.clear_handlers(close=True)
 
+    def __enter__(self) -> "Logger":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        del exc_type, exc, tb
+        self.close()
+
 
 class BoundLogger:
     """Logger wrapper that merges pre-bound extra fields into every record."""
@@ -172,6 +204,18 @@ class BoundLogger:
         if extra:
             return {**self._extra, **extra}
         return dict(self._extra)
+
+    def __enter__(self) -> "BoundLogger":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        del exc_type, exc, tb
+        self._logger.close()
 
     def trace(
         self,
@@ -274,6 +318,9 @@ class BoundLogger:
 
     def bind(self, **extra: Any) -> BoundLogger:
         return BoundLogger(self._logger, {**self._extra, **extra})
+
+    def set_level(self, level: Level | str | int) -> None:
+        self._logger.set_level(level)
 
 
 def _format_exception(exc_info: ExcInfoArg) -> str | None:

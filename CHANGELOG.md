@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0 - 2026-05-10
+
+### Added
+- `mollog.configure(format="%(asctime)s %(levelname)s %(name)s %(message)s")` accepts stdlib `logging.basicConfig`-style format strings, plus a matching `datefmt=` kwarg, rendered via the new `StdlibStyleFormatter`.
+- `mollog.configure(capture_stdlib=True)` (default) installs a `StdlibBridgeHandler` on stdlib's root logger so third-party libraries that emit through `logging` (httpx, urllib3, …) flow through mollog's hierarchy. Disable with `capture_stdlib=False`.
+- `Logger.set_level()` and `BoundLogger.set_level()` accept `Level | str | int` and propagate to `logging.getLogger(name).setLevel(...)` so per-logger silencing works at both layers.
+- Module-level convenience helpers on the root logger: `mollog.trace`, `mollog.debug`, `mollog.info`, `mollog.warning`, `mollog.error`, `mollog.critical`, `mollog.exception`, `mollog.set_level`.
+- Stdlib-compatible level constants re-exported at the top level: `mollog.TRACE`, `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+- New public surface: `StdlibBridgeHandler`, `StdlibStyleFormatter`, `capture_stdlib_logging`, `release_stdlib_logging`.
+
+### Changed
+- `LoggerManager.shutdown()` and `_reset()` also tear down any installed stdlib bridges.
+
 ## 1.1.0 - 2026-04-18
 
 ### Added
