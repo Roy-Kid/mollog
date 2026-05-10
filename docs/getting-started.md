@@ -3,29 +3,38 @@
 ## Install
 
 ```bash
-pip install -e .
+pip install molcrafts-mollog
 ```
 
 For development with tests and docs tooling:
 
 ```bash
-pip install -e ".[dev,docs,rich]"
+pip install -e ".[dev,docs]"
 ```
 
-## Configure the root logger
+## Migrate from `logging`
+
+`mollog` is a drop-in for `logging.basicConfig`. The three lines you would normally write against stdlib become three lines of mollog:
 
 ```python
-from mollog import StreamHandler, TextFormatter, configure, get_logger
+import mollog
 
-handler = StreamHandler()
-handler.set_formatter(TextFormatter())
-configure(level="info", handlers=[handler])
+mollog.configure(
+    level="INFO",
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+mollog.get_logger("httpx").set_level("WARNING")
 
-logger = get_logger("app")
-logger.info("service booted", port=8080)
+mollog.info("service booted", port=8080)
 ```
 
-## Switch to JSON output
+That is the whole story:
+
+- `configure(format=...)` accepts stdlib `%(asctime)s`-style format strings.
+- `get_logger(name).set_level(...)` accepts level names, ints, or `Level` members; the call also propagates to `logging.getLogger(name)` so libraries that still emit through stdlib are silenced at the source.
+- The default `capture_stdlib=True` routes any third-party `logging` record (httpx, urllib3, openai, …) through mollog so a single configuration governs the whole process.
+
+## Configure with explicit handlers
 
 ```python
 from mollog import JSONFormatter, StreamHandler, configure, get_logger
@@ -41,9 +50,9 @@ logger.info("request completed", status=200, duration_ms=18)
 ## Bind reusable context
 
 ```python
-from mollog import Logger
+from mollog import get_logger
 
-logger = Logger("pipeline")
+logger = get_logger("pipeline")
 run_logger = logger.bind(run_id="r-2026-04-11", batch="alpha")
 run_logger.info("batch started")
 run_logger.warning("low confidence", score=0.63)
@@ -90,13 +99,7 @@ with QueueListener(q, StreamHandler()):
 
 ## Add Rich console output
 
-Install the optional extra:
-
-```bash
-pip install -e ".[rich]"
-```
-
-Then switch the console handler:
+`rich` ships as a required runtime dependency, so `RichHandler` is available out of the box:
 
 ```python
 from mollog import Logger, RichHandler
@@ -111,23 +114,18 @@ logger.info("rendering preview", width=120, height=80)
 `mollog` can capture formatted exception traces and stack information directly on the record:
 
 ```python
-from mollog import JSONFormatter, Logger, StreamHandler
-
-logger = Logger("api")
-handler = StreamHandler()
-handler.set_formatter(JSONFormatter())
-logger.add_handler(handler)
+import mollog
 
 try:
     raise ValueError("bad payload")
 except ValueError:
-    logger.exception("request failed", request_id="req-17")
+    mollog.exception("request failed", request_id="req-17")
 ```
 
 You can also attach stack information without an active exception:
 
 ```python
-logger.warning("unexpected branch", stack_info=True, node="fallback")
+mollog.warning("unexpected branch", stack_info=True, node="fallback")
 ```
 
 ## Serve the documentation locally
