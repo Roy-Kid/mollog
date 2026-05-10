@@ -1,6 +1,7 @@
 import json
 import logging as _stdlib
 from abc import ABC, abstractmethod
+from typing import Literal
 
 from mollog.record import LogRecord
 
@@ -87,7 +88,7 @@ class StdlibStyleFormatter(Formatter):
         self,
         fmt: str,
         datefmt: str | None = None,
-        style: str = "%",
+        style: Literal["%", "{", "$"] = "%",
     ) -> None:
         self._fmt = fmt
         self._datefmt = datefmt
