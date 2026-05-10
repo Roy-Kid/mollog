@@ -1,40 +1,44 @@
 # mollog
 
-Zero-dependency structured logging for Python applications that need clear output, a small surface area, and explicit control.
+Structured logging for Python with a stdlib-compatible API — projects can drop `import logging` entirely while keeping access to `%(asctime)s`-style format strings and the third-party library ecosystem that emits through stdlib.
 
 [Get started](getting-started.md){ .md-button .md-button--primary }
 [API reference](api.md){ .md-button }
 
 ## What it gives you
 
+- Drop-in for `logging.basicConfig`: stdlib-style `format=` strings via `StdlibStyleFormatter`
+- Stdlib bridge that captures records from libraries which still use `logging` (httpx, urllib3, openai, …) and routes them through mollog
+- Top-level helpers — `mollog.info(...)`, `mollog.warning(...)`, `mollog.set_level(...)` — and `Logger.set_level()` that also propagates to stdlib
 - Named loggers with hierarchy and propagation
-- Structured `extra` fields and reusable context via `bind()`
-- Context-local fields for async and request-scoped flows via `contextvars`
+- Structured `extra` fields and reusable context via `Logger.bind()`
+- Context-local fields via the `Context` namespace (`Context.scope(...)` doubles as a logfire span when `configure_logfire(...)` has been called)
 - Exception and stack capture on every record
-- Text and JSON formatters
+- Text, JSON, Rich, and stdlib-style formatters
 - Stream, file, rotating-file, timed-rotating, queue, and null handlers
-- Optional Rich console output for local tooling and CLIs
+- Optional Logfire backend via `LogfireHandler` and `configure_logfire(...)`
 - `configure()` and `shutdown()` helpers for application lifecycle
-- No runtime dependencies
 
 ## Quick example
 
 ```python
-from mollog import JSONFormatter, StreamHandler, configure, get_logger
+import mollog
 
-handler = StreamHandler()
-handler.set_formatter(JSONFormatter())
-configure(level="info", handlers=[handler])
+mollog.configure(
+    level="INFO",
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+mollog.get_logger("httpx").set_level("WARNING")
 
-logger = get_logger("api")
-logger.info("request complete", status=200, duration_ms=18)
+mollog.info("service booted", port=8080)
 ```
 
 ## Documentation map
 
 - [Getting Started](getting-started.md) — installation, setup, common patterns
-- [Configuration](configuration.md) — root logger setup and teardown
+- [Configuration](configuration.md) — root logger setup, stdlib bridge, teardown
 - [Context Propagation](context.md) — request and task scoped metadata
 - [Behavior](behavior.md) — concurrency, reserved fields, shutdown semantics
+- [Logfire](logfire.md) — optional Pydantic Logfire backend
 - [Rich Console](rich.md) — colored terminal output
 - [API Reference](api.md) — complete exported surface

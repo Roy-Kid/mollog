@@ -4,14 +4,15 @@ import sys
 import threading
 from collections.abc import Iterable
 from pathlib import Path
-from typing import IO
+from typing import IO, Any
 
 from mollog._context import Context
 from mollog._file_handler import FileHandler
-from mollog._formatter import Formatter, TextFormatter
+from mollog._formatter import Formatter, StdlibStyleFormatter, TextFormatter
 from mollog._handler import Handler, StreamHandler
 from mollog._level import Level
-from mollog._logger import Logger
+from mollog._logger import ExcInfoArg, Logger
+from mollog._stdlib_bridge import capture_stdlib_logging, release_stdlib_logging
 
 
 class LoggerManager:
@@ -74,6 +75,8 @@ class LoggerManager:
         level: Level | str | int = Level.INFO,
         handlers: Iterable[Handler] | None = None,
         formatter: Formatter | None = None,
+        format: str | None = None,
+        datefmt: str | None = None,
         replace: bool = True,
         stream: IO[str] | None = None,
         filename: str | Path | None = None,
@@ -81,6 +84,7 @@ class LoggerManager:
         file_level: Level | str | int | None = None,
         file_formatter: Formatter | None = None,
         encoding: str = "utf-8",
+        capture_stdlib: bool = True,
     ) -> Logger:
         """Configure the root logger for library or application use.
 
@@ -99,12 +103,26 @@ class LoggerManager:
           :class:`FileHandler` is added alongside it.
         * *file_level* / *file_formatter* let the file sink diverge from
           the console (e.g. DEBUG to file, INFO to terminal).
+        * *format* accepts a stdlib :func:`logging.basicConfig`-style
+          format string (``"%(asctime)s %(levelname)s %(name)s %(message)s"``)
+          and is rendered through :class:`StdlibStyleFormatter`. Mutually
+          exclusive with *formatter* — pass one or the other.
+        * *capture_stdlib* (default ``True``) installs a
+          :class:`StdlibBridgeHandler` on stdlib's root logger so that
+          third-party libraries which emit through :mod:`logging`
+          (httpx, urllib3, …) flow through mollog's hierarchy. Pass
+          ``False`` to leave stdlib alone.
         """
 
+        if formatter is not None and format is not None:
+            raise ValueError("pass either `formatter` or `format`, not both")
+
         resolved_level = Level.coerce(level)
-        resolved_file_level = (
-            Level.coerce(file_level) if file_level is not None else resolved_level
-        )
+        resolved_file_level = Level.coerce(file_level) if file_level is not None else resolved_level
+
+        if formatter is None and format is not None:
+            formatter = StdlibStyleFormatter(format, datefmt=datefmt)
+
         with self._state_lock:
             root = self._root
             root.level = resolved_level
@@ -140,10 +158,20 @@ class LoggerManager:
                     root.add_handler(file_handler)
 
             self._configured = True
-            return root
+
+        if capture_stdlib:
+            capture_stdlib_logging(replace=replace)
+        elif replace:
+            release_stdlib_logging()
+
+        return root
 
     def shutdown(self) -> None:
-        """Close all registered handlers and clear runtime state."""
+        """Close all registered handlers and clear runtime state.
+
+        Also removes any :class:`StdlibBridgeHandler` installed on
+        stdlib's root logger.
+        """
 
         with self._state_lock:
             closed: set[int] = set()
@@ -157,6 +185,7 @@ class LoggerManager:
                     handler.close()
                     closed.add(ident)
             self._configured = False
+        release_stdlib_logging()
         Context.clear()
 
     def _reset(self) -> None:
@@ -166,6 +195,7 @@ class LoggerManager:
             self._root = Logger("", Level.INFO)
             self._loggers[""] = self._root
             self._configured = False
+        release_stdlib_logging()
 
 
 def get_logger(name: str = "") -> Logger:
@@ -184,6 +214,8 @@ def configure(
     level: Level | str | int = Level.INFO,
     handlers: Iterable[Handler] | None = None,
     formatter: Formatter | None = None,
+    format: str | None = None,
+    datefmt: str | None = None,
     replace: bool = True,
     stream: IO[str] | None = None,
     filename: str | Path | None = None,
@@ -191,18 +223,24 @@ def configure(
     file_level: Level | str | int | None = None,
     file_formatter: Formatter | None = None,
     encoding: str = "utf-8",
+    capture_stdlib: bool = True,
 ) -> Logger:
     """Configure and return the root logger.
 
     See :meth:`LoggerManager.configure` for the full parameter reference.
-    The short version: pass *filename* to also mirror records into a file
-    alongside the terminal stream.
+    Pass *format* (stdlib ``%(asctime)s`` style) instead of *formatter*
+    if you're migrating from :func:`logging.basicConfig`.
+    *capture_stdlib* (default ``True``) routes stdlib :mod:`logging`
+    records through mollog so libraries like httpx are governed by the
+    same hierarchy.
     """
 
     return LoggerManager().configure(
         level=level,
         handlers=handlers,
         formatter=formatter,
+        format=format,
+        datefmt=datefmt,
         replace=replace,
         stream=stream,
         filename=filename,
@@ -210,6 +248,7 @@ def configure(
         file_level=file_level,
         file_formatter=file_formatter,
         encoding=encoding,
+        capture_stdlib=capture_stdlib,
     )
 
 
@@ -217,3 +256,73 @@ def shutdown() -> None:
     """Close all configured handlers and clear context-local state."""
 
     LoggerManager().shutdown()
+
+
+def set_level(level: Level | str | int) -> None:
+    """Set the root logger's minimum level (mollog and stdlib bridge)."""
+
+    get_logger("").set_level(level)
+
+
+def trace(
+    message: str,
+    *,
+    exc_info: ExcInfoArg = None,
+    stack_info: bool = False,
+    **extra: Any,
+) -> None:
+    get_logger("").trace(message, exc_info=exc_info, stack_info=stack_info, **extra)
+
+
+def debug(
+    message: str,
+    *,
+    exc_info: ExcInfoArg = None,
+    stack_info: bool = False,
+    **extra: Any,
+) -> None:
+    get_logger("").debug(message, exc_info=exc_info, stack_info=stack_info, **extra)
+
+
+def info(
+    message: str,
+    *,
+    exc_info: ExcInfoArg = None,
+    stack_info: bool = False,
+    **extra: Any,
+) -> None:
+    get_logger("").info(message, exc_info=exc_info, stack_info=stack_info, **extra)
+
+
+def warning(
+    message: str,
+    *,
+    exc_info: ExcInfoArg = None,
+    stack_info: bool = False,
+    **extra: Any,
+) -> None:
+    get_logger("").warning(message, exc_info=exc_info, stack_info=stack_info, **extra)
+
+
+def error(
+    message: str,
+    *,
+    exc_info: ExcInfoArg = None,
+    stack_info: bool = False,
+    **extra: Any,
+) -> None:
+    get_logger("").error(message, exc_info=exc_info, stack_info=stack_info, **extra)
+
+
+def critical(
+    message: str,
+    *,
+    exc_info: ExcInfoArg = None,
+    stack_info: bool = False,
+    **extra: Any,
+) -> None:
+    get_logger("").critical(message, exc_info=exc_info, stack_info=stack_info, **extra)
+
+
+def exception(message: str, **extra: Any) -> None:
+    get_logger("").exception(message, **extra)

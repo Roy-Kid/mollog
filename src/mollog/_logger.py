@@ -54,6 +54,25 @@ class Logger:
     def is_enabled_for(self, level: Level) -> bool:
         return level >= self.level
 
+    def set_level(self, level: Level | str | int) -> None:
+        """Set this logger's minimum level, accepting names or stdlib ints.
+
+        Also propagates to ``logging.getLogger(self.name).setLevel(...)``
+        so that records emitted through stdlib (via the
+        :class:`mollog.StdlibBridgeHandler` or otherwise) are dropped at
+        the stdlib boundary too — this is what makes
+        ``mollog.get_logger("httpx").set_level("WARNING")`` silence
+        httpx noise without ever importing :mod:`logging`.
+        """
+
+        import logging as _stdlib
+
+        from mollog._stdlib_bridge import mollog_to_stdlib_level
+
+        resolved = Level.coerce(level)
+        self.level = resolved
+        _stdlib.getLogger(self.name).setLevel(mollog_to_stdlib_level(resolved))
+
     def _merged_extra(self, call_extra: dict[str, Any] | None) -> dict[str, Any]:
         merged = Context.get()
         if self._bound_extra:

@@ -11,20 +11,24 @@ No environment variables are read. All configuration must flow through
 from __future__ import annotations
 
 from contextlib import AbstractContextManager, nullcontext
-from typing import Any
+from typing import Any, Literal
 
 from mollog._handler import Handler
 from mollog._level import Level
 from mollog._record import LogRecord
 
 try:  # pragma: no cover - exercised via import fallback in tests
-    import logfire as _logfire_mod
+    import logfire as _imported_logfire
+
+    _logfire_mod: Any | None = _imported_logfire
 except ImportError:  # pragma: no cover
     _logfire_mod = None
 
 _CONFIGURED: bool = False
 
-_LEVEL_MAP: dict[Level, str] = {
+LogfireLevelName = Literal["trace", "debug", "info", "notice", "warn", "error", "fatal"]
+
+_LEVEL_MAP: dict[Level, LogfireLevelName] = {
     Level.TRACE: "trace",
     Level.DEBUG: "debug",
     Level.INFO: "info",
@@ -33,9 +37,7 @@ _LEVEL_MAP: dict[Level, str] = {
     Level.CRITICAL: "fatal",
 }
 
-_INSTALL_HINT = (
-    "logfire is not installed. Install it with: pip install 'molcrafts-mollog[logfire]'"
-)
+_INSTALL_HINT = "logfire is not installed. Install it with: pip install 'molcrafts-mollog[logfire]'"
 _UNCONFIGURED_HINT = "call mollog.configure_logfire(...) before using logfire features"
 
 

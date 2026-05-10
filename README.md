@@ -6,38 +6,43 @@
 [![Python](https://img.shields.io/badge/python-3.12%2B-3776AB.svg?logo=python&logoColor=white)](./pyproject.toml)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-16A34A.svg)](./LICENSE)
 
-Zero-dependency structured logging for Python.
+Structured logging for Python with a stdlib-compatible API — no `import logging` required.
 
 ## Quick Start
 
 ```python
-from mollog import JSONFormatter, StreamHandler, configure, get_logger
+import mollog
 
-handler = StreamHandler()
-handler.set_formatter(JSONFormatter())
-configure(level="info", handlers=[handler])
+mollog.configure(
+    level="INFO",
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+mollog.get_logger("httpx").set_level("WARNING")  # silence noisy library
 
-logger = get_logger("api")
-logger.info("request complete", status=200, duration_ms=18)
+mollog.info("service booted", port=8080)
 ```
+
+`mollog.configure(...)` accepts the same `format=` strings as `logging.basicConfig`, and by default installs a bridge so records emitted by libraries that still use stdlib `logging` (httpx, urllib3, openai, …) flow through mollog's hierarchy. Disable with `capture_stdlib=False`.
 
 ```bash
 pip install molcrafts-mollog
-# with Rich terminal output
-pip install "molcrafts-mollog[rich]"
+# with optional logfire backend
+pip install "molcrafts-mollog[logfire]"
 ```
 
 ## Features
 
+- Drop-in for `logging.basicConfig`: stdlib-style `format=` strings and stdlib bridge
+- Top-level helpers: `mollog.{trace, debug, info, warning, error, critical, exception}`
+- Per-logger level control: `mollog.get_logger("httpx").set_level("WARNING")` (propagates to stdlib)
 - Named loggers with hierarchy and propagation
-- Structured `extra` fields and `bind()` for reusable context
-- Context-local fields via `bind_context()` / `scoped_context()`
+- Structured `extra` fields and `Logger.bind()` for reusable context
+- Context-local fields via the `Context` namespace (`Context.scope(...)` doubles as a logfire span)
 - Exception and stack capture on every record
-- `TextFormatter` and `JSONFormatter`
+- `TextFormatter`, `JSONFormatter`, `RichFormatter`, and stdlib-style `StdlibStyleFormatter`
 - `StreamHandler`, `FileHandler`, `RotatingFileHandler`, `TimedRotatingFileHandler`, `QueueHandler`
-- Optional `RichHandler` for colored terminal output
+- Optional `LogfireHandler` + `configure_logfire()` for [Pydantic Logfire](https://logfire.pydantic.dev) backends
 - `configure()` and `shutdown()` for application lifecycle
-- No runtime dependencies
 
 ---
 

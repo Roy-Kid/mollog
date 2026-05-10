@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import Any
+from typing import Any, Literal
 
 from rich.console import Console
 from rich.highlighter import ReprHighlighter
@@ -10,6 +10,8 @@ from rich.text import Text
 from mollog._formatter import Formatter
 from mollog._level import Level
 from mollog._record import LogRecord
+
+ColorSystem = Literal["auto", "standard", "256", "truecolor", "windows"]
 
 
 class RichFormatter(Formatter):
@@ -38,7 +40,7 @@ class RichFormatter(Formatter):
         markup: bool = False,
         highlighter: ReprHighlighter | None = None,
         time_format: str = "%H:%M:%S",
-        color_system: str | None = "truecolor",
+        color_system: ColorSystem | None = "truecolor",
         force_terminal: bool = True,
     ) -> None:
         self._show_time = show_time

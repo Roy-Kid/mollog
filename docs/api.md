@@ -1,31 +1,42 @@
 # API Reference
 
+## Top-level helpers
+
+The `mollog` package exposes module-level shortcuts so common workflows can be written without ever importing `logging`.
+
+- `mollog.configure(...)` — root-logger setup; see [Configuration](configuration.md)
+- `mollog.shutdown()` — close handlers, remove stdlib bridges, clear context-local state
+- `mollog.get_logger(name="")` — get-or-create a named logger
+- `mollog.set_level(level)` — set the root logger's minimum level
+- `mollog.trace(message, **extra)`
+- `mollog.debug(message, **extra)`
+- `mollog.info(message, **extra)`
+- `mollog.warning(message, **extra)`
+- `mollog.error(message, **extra)`
+- `mollog.critical(message, **extra)`
+- `mollog.exception(message, **extra)` — captures the current exception via `exc_info=True`
+
+Each level helper also accepts optional `exc_info=` and `stack_info=` keyword arguments.
+
+## Level constants
+
+Stdlib-compatible aliases for the `Level` enum members:
+
+- `mollog.TRACE`, `mollog.DEBUG`, `mollog.INFO`, `mollog.WARNING`, `mollog.ERROR`, `mollog.CRITICAL`
+
 ## Core types
 
 ### `Level`
 
 Severity enum in ascending order:
 
-- `TRACE`
-- `DEBUG`
-- `INFO`
-- `WARNING`
-- `ERROR`
-- `CRITICAL`
+- `TRACE` (5), `DEBUG` (10), `INFO` (20), `WARNING` (30), `ERROR` (40), `CRITICAL` (50)
 
-Also provides `Level.coerce(...)` for configuration-friendly parsing from enum values, strings, or ints.
+`Level.coerce(value)` parses an enum member, level name string, or stdlib int into a `Level`.
 
 ### `LogRecord`
 
-Immutable dataclass with:
-
-- `level`
-- `message`
-- `logger_name`
-- `timestamp`
-- `extra`
-- `exception`
-- `stack_info`
+Immutable dataclass with: `level`, `message`, `logger_name`, `timestamp`, `extra`, `exception`, `stack_info`.
 
 ## Loggers
 
@@ -37,7 +48,9 @@ Methods:
 
 - `add_handler(handler)`
 - `remove_handler(handler)`
+- `clear_handlers(close=False)`
 - `is_enabled_for(level)`
+- `set_level(level)` — accepts `Level | str | int`; also propagates to `logging.getLogger(name).setLevel(...)` so stdlib drops the record at the source
 - `trace(message, **extra)`
 - `debug(message, **extra)`
 - `info(message, **extra)`
@@ -47,7 +60,6 @@ Methods:
 - `exception(message, **extra)`
 - `fire(message, *, level=Level.INFO, **extra)` — dispatch to attached `LogfireHandler`(s) only
 - `bind(**extra)` — returns a `Logger` view carrying additional persistent fields
-- `clear_handlers(close=False)`
 - `close()`
 
 Each level method also accepts optional `exc_info=` and `stack_info=` keyword arguments.
@@ -101,6 +113,10 @@ Consumes records from a queue and dispatches them to one or more handlers on a b
 
 Handler that forwards records to `logfire` (see the Logfire integration section above).
 
+### `StdlibBridgeHandler`
+
+Stdlib `logging.Handler` that converts each incoming `logging.LogRecord` into a mollog `LogRecord` and dispatches it through `LoggerManager().get_logger(record.name)`. Installed by `mollog.configure(capture_stdlib=True)` (the default) on stdlib's root logger.
+
 ## Formatters
 
 ### `TextFormatter`
@@ -114,6 +130,10 @@ Single-line JSON formatter for structured log pipelines.
 ### `RichFormatter`
 
 Formatter that produces ANSI-styled lines via `rich`. Pair with any string-writing handler via `handler.set_formatter(RichFormatter())`.
+
+### `StdlibStyleFormatter`
+
+Drop-in for `logging.Formatter`. Accepts stdlib `%(asctime)s`-style format strings; used internally when you pass `format=` to `mollog.configure(...)`.
 
 ## Filters
 
@@ -137,8 +157,18 @@ Convenience helper that creates or returns a named logger and ensures a default 
 
 ### `configure(...)`
 
-Configures the root logger with explicit handlers, level, and optional formatter.
+Configures the root logger. Accepts `level`, `handlers`, `formatter` *or* `format` (stdlib `%(asctime)s`-style), `datefmt`, `replace`, `stream`, `filename`, `filemode`, `file_level`, `file_formatter`, `encoding`, and `capture_stdlib`. See [Configuration](configuration.md).
 
 ### `shutdown()`
 
-Closes configured handlers and clears context-local runtime state.
+Closes configured handlers, removes any installed `StdlibBridgeHandler`, and clears context-local runtime state.
+
+## Stdlib bridge helpers
+
+### `capture_stdlib_logging(*, level=Level.TRACE, replace=True)`
+
+Installs a `StdlibBridgeHandler` on stdlib's root logger and returns it. With `replace=True` (default), removes any existing root handlers first, mirroring `logging.basicConfig` reset semantics.
+
+### `release_stdlib_logging()`
+
+Removes every `StdlibBridgeHandler` from stdlib's root logger. Idempotent; leaves other handlers untouched.
