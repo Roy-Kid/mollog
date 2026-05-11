@@ -246,6 +246,44 @@ class Logger:
     def close(self) -> None:
         self.clear_handlers(close=True)
 
+    def hasHandlers(self) -> bool:  # noqa: N802 — stdlib name
+        """Whether this logger or a non-propagation-blocked ancestor has handlers."""
+
+        current: Logger | None = self
+        while current is not None:
+            if current.handlers:
+                return True
+            if not current.propagate:
+                return False
+            current = current.parent
+        return False
+
+    def getEffectiveLevel(self) -> int:  # noqa: N802 — stdlib name
+        """Walk up the hierarchy and return the first non-zero level."""
+
+        current: Logger | None = self
+        while current is not None:
+            if int(current.level) > 0:
+                return int(current.level)
+            current = current.parent
+        return int(Level.WARNING)
+
+    def getChild(self, suffix: str) -> Logger:  # noqa: N802 — stdlib name
+        """Return a child logger under this logger's dotted name."""
+
+        if not suffix:
+            raise ValueError("suffix must be a non-empty string")
+        from mollog._manager import LoggerManager
+
+        child_name = f"{self.name}.{suffix}" if self.name else suffix
+        return LoggerManager().get_logger(child_name)
+
+    # Stdlib drop-in aliases — same body, stdlib's camelCase names.
+    setLevel = set_level
+    addHandler = add_handler
+    removeHandler = remove_handler
+    isEnabledFor = is_enabled_for
+
 
 def _format_exception(exc_info: ExcInfoArg) -> str | None:
     resolved = _resolve_exc_info(exc_info)

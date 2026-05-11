@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.2 - 2026-05-11
+
+### Added
+- Stdlib drop-in surface so `import mollog as logging` works:
+  - `mollog.basicConfig(**kwargs)` accepts stdlib's `filename`, `filemode`, `format`, `datefmt`, `style`, `level`, `stream`, `handlers`, `force`, `encoding`, `errors` kwargs with stdlib semantics (no-op when root has handlers unless `force=True`; mutually exclusive `stream`/`filename`/`handlers`; only `%`-style format strings are accepted).
+  - `mollog.getLogger(name=None)` returns the root logger when called with no arg or `None`, otherwise delegates to `get_logger`.
+  - `Logger` gains `setLevel`, `addHandler`, `removeHandler`, `isEnabledFor` aliases pointing at the existing snake_case methods, plus `hasHandlers()`, `getEffectiveLevel()`, and `getChild(suffix)` with stdlib semantics.
+- Level constants `NOTSET`, `WARN`, `FATAL` re-exported at the top level.
+
+### Changed
+- Top-level level constants (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`, …) are now the plain-`int` objects from `logging`, so `mollog.WARNING is logging.WARNING`. `TRACE` is mollog's superset addition (still a plain `int`, still coerces back to `Level.TRACE` via `Level.coerce`).
+
 ## 1.2.1 - 2026-05-10
 
 ### Performance

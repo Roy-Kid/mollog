@@ -216,6 +216,17 @@ def get_logger(name: str = "") -> Logger:
     return mgr.get_logger(name)
 
 
+def getLogger(name: str | None = None) -> Logger:
+    """Drop-in alias for :func:`logging.getLogger`.
+
+    Accepts ``None`` (the stdlib convention for "give me the root
+    logger") as well as the empty string. Otherwise identical to
+    :func:`get_logger`.
+    """
+
+    return get_logger(name or "")
+
+
 def configure(
     *,
     level: Level | str | int = Level.INFO,
@@ -256,6 +267,84 @@ def configure(
         file_formatter=file_formatter,
         encoding=encoding,
         capture_stdlib=capture_stdlib,
+    )
+
+
+_BASIC_CONFIG_KEYS = frozenset(
+    {
+        "filename",
+        "filemode",
+        "format",
+        "datefmt",
+        "style",
+        "level",
+        "stream",
+        "handlers",
+        "force",
+        "encoding",
+        "errors",
+    }
+)
+
+
+def basicConfig(**kwargs: Any) -> None:
+    """Drop-in for :func:`logging.basicConfig`.
+
+    Accepts the same kwargs as stdlib (*filename*, *filemode*, *format*,
+    *datefmt*, *style*, *level*, *stream*, *handlers*, *force*,
+    *encoding*, *errors*) with stdlib semantics:
+
+    * No-op when the root logger already has handlers, unless
+      ``force=True`` is passed (in which case existing handlers are
+      removed first).
+    * ``stream``, ``filename``, and ``handlers`` are mutually exclusive.
+    * Returns ``None``.
+
+    Under the hood this routes through :func:`configure`, so the stdlib
+    :mod:`logging` bridge is installed and records emitted by
+    third-party libraries flow through mollog's hierarchy. Use
+    :func:`configure` directly if you need mollog-only features like
+    simultaneous stream + file destinations.
+    """
+
+    unknown = set(kwargs) - _BASIC_CONFIG_KEYS
+    if unknown:
+        raise ValueError(f"Unrecognised argument(s): {', '.join(sorted(unknown))}")
+
+    stream = kwargs.get("stream")
+    filename = kwargs.get("filename")
+    handlers = kwargs.get("handlers")
+    if sum(x is not None for x in (stream, filename, handlers)) > 1:
+        raise ValueError("'stream', 'filename', and 'handlers' are mutually exclusive")
+
+    style = kwargs.get("style", "%")
+    if style != "%":
+        raise ValueError(
+            f"basicConfig(style={style!r}) is not supported; mollog only "
+            "renders '%' style format strings (see StdlibStyleFormatter)"
+        )
+
+    mgr = LoggerManager()
+    if mgr.root.handlers and not kwargs.get("force", False):
+        return
+
+    level = kwargs.get("level")
+    if level is None:
+        level = mgr.root.level
+
+    encoding = kwargs.get("encoding")
+
+    mgr.configure(
+        level=level,
+        handlers=handlers,
+        format=kwargs.get("format"),
+        datefmt=kwargs.get("datefmt"),
+        replace=True,
+        stream=stream,
+        filename=filename,
+        filemode=kwargs.get("filemode", "a"),
+        encoding=encoding if encoding is not None else "utf-8",
+        capture_stdlib=True,
     )
 
 

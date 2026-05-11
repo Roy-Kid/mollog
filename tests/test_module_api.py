@@ -66,16 +66,57 @@ def _reset_state():
 
 
 class TestLevelConstants:
-    def test_constants_are_level_enum_members(self) -> None:
-        assert TRACE is Level.TRACE
-        assert DEBUG is Level.DEBUG
-        assert INFO is Level.INFO
-        assert WARNING is Level.WARNING
-        assert ERROR is Level.ERROR
-        assert CRITICAL is Level.CRITICAL
+    def test_constants_are_identical_to_stdlib_logging(self) -> None:
+        # Plain `int` objects — same identity as stdlib's, not a
+        # re-invented `Level` enum substitute.
+        assert mollog.NOTSET is stdlib_logging.NOTSET
+        assert mollog.DEBUG is stdlib_logging.DEBUG
+        assert mollog.INFO is stdlib_logging.INFO
+        assert mollog.WARNING is stdlib_logging.WARNING
+        assert mollog.WARN is stdlib_logging.WARN
+        assert mollog.ERROR is stdlib_logging.ERROR
+        assert mollog.CRITICAL is stdlib_logging.CRITICAL
+        assert mollog.FATAL is stdlib_logging.FATAL
+        for const in (
+            mollog.NOTSET,
+            mollog.DEBUG,
+            mollog.INFO,
+            mollog.WARNING,
+            mollog.WARN,
+            mollog.ERROR,
+            mollog.CRITICAL,
+            mollog.FATAL,
+        ):
+            assert type(const) is int
+
+    def test_trace_is_mollog_superset_addition(self) -> None:
+        # stdlib has no TRACE — this is mollog's superset addition. It
+        # must still be a plain int, and Level.coerce must accept it.
+        assert TRACE == 5
+        assert type(TRACE) is int
+        assert Level.coerce(TRACE) is Level.TRACE
+
+    def test_constants_coerce_back_to_level_for_internal_use(self) -> None:
+        # Plain-int constants must still feed `Level.coerce` cleanly so
+        # internal mollog code keeps its enum-typed representation.
+        assert Level.coerce(DEBUG) is Level.DEBUG
+        assert Level.coerce(INFO) is Level.INFO
+        assert Level.coerce(WARNING) is Level.WARNING
+        assert Level.coerce(ERROR) is Level.ERROR
+        assert Level.coerce(CRITICAL) is Level.CRITICAL
 
     def test_constants_in_dunder_all(self) -> None:
-        for name in ("TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+        for name in (
+            "NOTSET",
+            "TRACE",
+            "DEBUG",
+            "INFO",
+            "WARNING",
+            "WARN",
+            "ERROR",
+            "CRITICAL",
+            "FATAL",
+        ):
             assert name in mollog.__all__
 
 
@@ -269,6 +310,114 @@ class TestStdlibBridge:
 # ──────────────────────────────────────────────────────────────────────
 # End-to-end: the user's migration scenario
 # ──────────────────────────────────────────────────────────────────────
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Stdlib drop-in surface: getLogger, basicConfig, camelCase Logger API
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestStdlibDropInSurface:
+    def test_getLogger_returns_root_for_none(self) -> None:
+        root = mollog.getLogger()
+        assert root is LoggerManager().root
+        assert mollog.getLogger(None) is root
+
+    def test_getLogger_returns_named_logger(self) -> None:
+        log = mollog.getLogger("svc.api")
+        assert log.name == "svc.api"
+        assert log is mollog.get_logger("svc.api")
+
+    def test_basicConfig_returns_none(self) -> None:
+        result = mollog.basicConfig(level=mollog.INFO, stream=io.StringIO())
+        assert result is None
+
+    def test_basicConfig_is_noop_when_handlers_present(self) -> None:
+        first_buf = io.StringIO()
+        mollog.basicConfig(level="INFO", stream=first_buf)
+        # second call without force is a no-op — original stream stays attached
+        second_buf = io.StringIO()
+        mollog.basicConfig(level="INFO", stream=second_buf)
+        mollog.get_logger("svc").info("hello")
+        assert "hello" in first_buf.getvalue()
+        assert second_buf.getvalue() == ""
+
+    def test_basicConfig_force_replaces_handlers(self) -> None:
+        first_buf = io.StringIO()
+        mollog.basicConfig(level="INFO", stream=first_buf)
+        second_buf = io.StringIO()
+        mollog.basicConfig(level="INFO", stream=second_buf, force=True)
+        mollog.get_logger("svc").info("hello")
+        assert "hello" not in first_buf.getvalue()
+        assert "hello" in second_buf.getvalue()
+
+    def test_basicConfig_accepts_stdlib_format(self) -> None:
+        buf = io.StringIO()
+        mollog.basicConfig(
+            level="INFO",
+            stream=buf,
+            format="%(levelname)s %(name)s %(message)s",
+        )
+        mollog.get_logger("svc").info("hi")
+        assert buf.getvalue().strip() == "INFO svc hi"
+
+    def test_basicConfig_rejects_stream_and_filename_together(self) -> None:
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            mollog.basicConfig(stream=io.StringIO(), filename="/tmp/x.log")
+
+    def test_basicConfig_rejects_unknown_kwargs(self) -> None:
+        with pytest.raises(ValueError, match="Unrecognised"):
+            mollog.basicConfig(level="INFO", banana="yes")  # type: ignore[arg-type]
+
+    def test_basicConfig_rejects_non_percent_style(self) -> None:
+        with pytest.raises(ValueError, match="style"):
+            mollog.basicConfig(level="INFO", style="{")
+
+    def test_import_mollog_as_logging_pattern(self) -> None:
+        """The full drop-in: `import mollog as logging` should just work."""
+
+        logging = mollog  # noqa: N806 — simulates `import mollog as logging`
+        buf = io.StringIO()
+        logging.basicConfig(level=logging.INFO, stream=buf, format="%(message)s")
+        log = logging.getLogger(__name__)
+        log.setLevel(logging.WARNING)
+        log.info("dropped")
+        log.warning("kept")
+        out = buf.getvalue()
+        assert "dropped" not in out
+        assert "kept" in out
+
+    def test_logger_camelcase_aliases_share_state_with_snake_case(self) -> None:
+        log = mollog.get_logger("svc")
+        log.setLevel("WARNING")
+        assert log.level is Level.WARNING
+        assert log.isEnabledFor(Level.ERROR)
+        assert not log.isEnabledFor(Level.INFO)
+
+        from mollog._handler import StreamHandler
+
+        handler = StreamHandler(stream=io.StringIO())
+        log.addHandler(handler)
+        assert handler in log.handlers
+        log.removeHandler(handler)
+        assert handler not in log.handlers
+
+    def test_logger_getChild_builds_dotted_name(self) -> None:
+        parent = mollog.getLogger("svc")
+        child = parent.getChild("api")
+        assert child.name == "svc.api"
+        assert child.parent is parent
+
+    def test_logger_getChild_from_root_drops_leading_dot(self) -> None:
+        root = mollog.getLogger()
+        child = root.getChild("svc")
+        assert child.name == "svc"
+
+    def test_logger_hasHandlers_walks_ancestors(self) -> None:
+        mollog.basicConfig(level="INFO", stream=io.StringIO())
+        child = mollog.getLogger("svc.api")
+        assert child.handlers == []
+        assert child.hasHandlers()  # inherits from root
 
 
 def test_user_migration_scenario_works_without_importing_logging() -> None:

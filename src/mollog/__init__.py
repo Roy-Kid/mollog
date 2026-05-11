@@ -1,5 +1,6 @@
 """mollog — structured logging for molcrafts."""
 
+import logging as _stdlib_logging
 from importlib.metadata import PackageNotFoundError, version
 
 from mollog._context import Context
@@ -12,12 +13,14 @@ from mollog._logfire import LogfireHandler, configure_logfire
 from mollog._logger import Logger
 from mollog._manager import (
     LoggerManager,
+    basicConfig,
     configure,
     critical,
     debug,
     error,
     exception,
     get_logger,
+    getLogger,
     info,
     set_level,
     shutdown,
@@ -38,25 +41,34 @@ try:
 except PackageNotFoundError:
     __version__ = "0+unknown"
 
-# Stdlib-compatible level constants for users migrating from `logging`.
-TRACE = Level.TRACE
-DEBUG = Level.DEBUG
-INFO = Level.INFO
-WARNING = Level.WARNING
-ERROR = Level.ERROR
-CRITICAL = Level.CRITICAL
+# Level constants: taken straight from stdlib `logging` so that
+# `mollog.WARNING is logging.WARNING` (same plain `int`, no enum
+# substitution). TRACE is mollog's superset addition — stdlib has no
+# equivalent.
+NOTSET = _stdlib_logging.NOTSET
+DEBUG = _stdlib_logging.DEBUG
+INFO = _stdlib_logging.INFO
+WARNING = _stdlib_logging.WARNING
+WARN = _stdlib_logging.WARN
+ERROR = _stdlib_logging.ERROR
+CRITICAL = _stdlib_logging.CRITICAL
+FATAL = _stdlib_logging.FATAL
+TRACE = int(Level.TRACE)
 
 
 __all__ = [
     "__version__",
     "Context",
     "Level",
+    "NOTSET",
     "TRACE",
     "DEBUG",
     "INFO",
     "WARNING",
+    "WARN",
     "ERROR",
     "CRITICAL",
+    "FATAL",
     "LogRecord",
     "Formatter",
     "TextFormatter",
@@ -77,8 +89,10 @@ __all__ = [
     "StdlibBridgeHandler",
     "Logger",
     "LoggerManager",
+    "basicConfig",
     "configure",
     "configure_logfire",
+    "getLogger",
     "get_logger",
     "set_level",
     "shutdown",
