@@ -35,6 +35,7 @@ from mollog._stdlib_bridge import (
     capture_stdlib_logging,
     release_stdlib_logging,
 )
+from mollog._timer import Timer
 
 try:
     __version__ = version("mollog")
@@ -87,6 +88,7 @@ __all__ = [
     "QueueListener",
     "LogfireHandler",
     "StdlibBridgeHandler",
+    "Timer",
     "Logger",
     "LoggerManager",
     "basicConfig",
