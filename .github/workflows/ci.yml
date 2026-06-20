@@ -24,7 +24,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Sync dependencies
-        run: uv sync --frozen --extra dev
+        run: uv sync --extra dev
 
       - name: Run Ruff
         run: uv run ruff check .
@@ -50,7 +50,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Sync dependencies
-        run: uv sync --frozen --extra dev
+        run: uv sync --extra dev
 
       - name: Run tests
         run: uv run pytest -q
