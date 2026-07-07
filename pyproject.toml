@@ -37,7 +37,7 @@ Changelog = "https://github.com/MolCrafts/mollog/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.11", "logfire>=3"]
-docs = ["zensical>=0.0.32"]
+docs = ["zensical>=0.0.45", "molcrafts-zensical-theme>=0.1.1"]
 logfire = ["logfire>=3"]
 
 [tool.setuptools]
