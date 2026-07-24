@@ -36,7 +36,9 @@ Issues = "https://github.com/MolCrafts/mollog/issues"
 Changelog = "https://github.com/MolCrafts/mollog/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.11", "logfire>=3"]
+dev = ["pytest>=8.0", "ruff>=0.11", "logfire>=3",
+  "tox>=4.23",
+]
 docs = ["zensical>=0.0.45", "molcrafts-zensical-theme>=0.1.1"]
 logfire = ["logfire>=3"]
 
@@ -61,3 +63,44 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+# Isolated gates — prek + CI: uv run --extra dev tox -e lint|py
+[tool.tox]
+requires = ["tox>=4.23"]
+env_list = ["lint", "py"]
+
+[tool.tox.env.lint]
+description = "CI lint"
+skip_install = true
+base_python = ["python3.12"]
+deps = [
+  "ruff>=0.11",
+  "pytest>=8.0",
+]
+commands = [
+  ["ruff", "check", "."],
+]
+
+[tool.tox.env.py]
+description = "CI test (non-editable package when package=wheel)"
+base_python = ["python3.12"]
+pass_env = [
+  "HOME",
+  "PATH",
+  "SSH_AUTH_SOCK",
+  "TERM",
+  "VIRTUAL_ENV",
+  "UV_*",
+]
+package = "wheel"
+extras = ["dev"]
+commands_pre = [
+  [
+    "{envpython}",
+    "-c",
+    "import pathlib, site; sps=site.getsitepackages(); print('site-packages', sps)",
+  ],
+]
+commands = [
+  ["{envpython}", "-m", "pytest", "-q"],
+]
