@@ -5,8 +5,10 @@
 The `mollog` package exposes module-level shortcuts so common workflows can be written without ever importing `logging`.
 
 - `mollog.configure(...)` — root-logger setup; see [Configuration](configuration.md)
+- `mollog.basicConfig(**kwargs)` — drop-in for `logging.basicConfig`; accepts stdlib's `filename`, `filemode`, `format`, `datefmt`, `style`, `level`, `stream`, `handlers`, `force`, `encoding`, `errors` kwargs (no-op when the root already has handlers unless `force=True`; `%`-style format strings only) and routes through `configure`
 - `mollog.shutdown()` — close handlers, remove stdlib bridges, clear context-local state
 - `mollog.get_logger(name="")` — get-or-create a named logger
+- `mollog.getLogger(name=None)` — stdlib-compatible alias for `get_logger`; `None` (or `""`) returns the root logger
 - `mollog.set_level(level)` — set the root logger's minimum level
 - `mollog.trace(message, **extra)`
 - `mollog.debug(message, **extra)`
@@ -20,9 +22,11 @@ Each level helper also accepts optional `exc_info=` and `stack_info=` keyword ar
 
 ## Level constants
 
-Stdlib-compatible aliases for the `Level` enum members:
+Level constants are the plain `int` objects re-exported from stdlib `logging`, so `mollog.WARNING is logging.WARNING`. `TRACE` is mollog's superset addition (a plain `int`, value `5`) that stdlib has no equivalent for.
 
-- `mollog.TRACE`, `mollog.DEBUG`, `mollog.INFO`, `mollog.WARNING`, `mollog.ERROR`, `mollog.CRITICAL`
+- `mollog.NOTSET`, `mollog.TRACE`, `mollog.DEBUG`, `mollog.INFO`, `mollog.WARNING`, `mollog.WARN`, `mollog.ERROR`, `mollog.CRITICAL`, `mollog.FATAL`
+
+`WARN` and `FATAL` are stdlib's aliases for `WARNING` and `CRITICAL` respectively.
 
 ## Core types
 
@@ -64,6 +68,8 @@ Methods:
 
 Each level method also accepts optional `exc_info=` and `stack_info=` keyword arguments.
 
+For a stdlib-compatible drop-in, `Logger` also exposes camelCase aliases and helpers with `logging.Logger` semantics: `setLevel`, `addHandler`, `removeHandler`, `isEnabledFor` (aliases of the snake_case methods above), plus `hasHandlers()`, `getEffectiveLevel()`, and `getChild(suffix)`.
+
 ## Context helpers
 
 All context operations live on the `Context` namespace class:
@@ -80,6 +86,10 @@ All context operations live on the `Context` namespace class:
 - `LogfireHandler(level=Level.TRACE)` — handler that forwards records to logfire. Attach with `logger.add_handler(LogfireHandler())`; `logger.fire(...)` routes events exclusively through attached `LogfireHandler` instances.
 
 ## Handlers
+
+### `Handler`
+
+Abstract base class for handlers. Subclass and implement `emit(record)`; the base provides `set_level`, `set_formatter`, filter management (`add_filter` / `remove_filter` / `clear_filters`), level/filter gating in `handle`, and context-manager support.
 
 ### `StreamHandler`
 
@@ -119,6 +129,10 @@ Stdlib `logging.Handler` that converts each incoming `logging.LogRecord` into a 
 
 ## Formatters
 
+### `Formatter`
+
+Abstract base class for formatters. Subclass and implement `format(record) -> str`.
+
 ### `TextFormatter`
 
 Human-readable formatter with optional string templates.
@@ -145,6 +159,19 @@ Abstract base class for record filtering.
 
 Filters records by `min_level` and `max_level`.
 
+## Utilities
+
+### `Timer`
+
+`Timer(name, *, log=True, level=Level.INFO, logger_name="mollog.timer")` — wall-clock stopwatch backed by `time.perf_counter`. Use it as a context manager (logs `"<name> took <seconds>s"` on exit by default) or drive it explicitly:
+
+- `start()` — start or restart; returns `self` for chaining
+- `stop()` — stop, optionally log, and return elapsed seconds
+- `elapsed` — elapsed seconds (`0.0` before `start`, live while running)
+- `running` — `True` between `start` and `stop`
+
+Pass `log=False` to use it as a silent stopwatch and read `elapsed` yourself.
+
 ## Manager helpers
 
 ### `LoggerManager`
@@ -155,9 +182,17 @@ Singleton registry used for hierarchical logger lookup.
 
 Convenience helper that creates or returns a named logger and ensures a default root stream handler exists.
 
+### `getLogger(name=None)`
+
+Stdlib-compatible alias for `get_logger`. `None` or `""` returns the root logger.
+
 ### `configure(...)`
 
 Configures the root logger. Accepts `level`, `handlers`, `formatter` *or* `format` (stdlib `%(asctime)s`-style), `datefmt`, `replace`, `stream`, `filename`, `filemode`, `file_level`, `file_formatter`, `encoding`, and `capture_stdlib`. See [Configuration](configuration.md).
+
+### `basicConfig(**kwargs)`
+
+Drop-in for `logging.basicConfig`. Accepts the stdlib kwargs (`filename`, `filemode`, `format`, `datefmt`, `style`, `level`, `stream`, `handlers`, `force`, `encoding`, `errors`) with stdlib semantics — a no-op when the root logger already has handlers unless `force=True`; `stream` / `filename` / `handlers` are mutually exclusive; only `%`-style format strings are accepted. Routes through `configure`, so the stdlib bridge is installed. Returns `None`.
 
 ### `shutdown()`
 

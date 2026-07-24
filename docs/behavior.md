@@ -12,8 +12,10 @@ Core record fields are protected:
 - `level`
 - `logger_name`
 - `message`
+- `exception`
+- `stack_info`
 
-If user-supplied `extra` data reuses one of these keys, the field is renamed with an `extra_` prefix in formatter output.
+If user-supplied `extra` data reuses one of these keys, `TextFormatter` and `JSONFormatter` rename the field with an `extra_` prefix in their output.
 
 Examples:
 
@@ -22,9 +24,9 @@ Examples:
 
 This preserves the original record shape and avoids silent overwrites.
 
-## Optional Rich support
+## Rich support
 
-`RichHandler` lives behind the `molcrafts-mollog[rich]` extra. Importing `mollog` does not require `rich`; the optional dependency is loaded only when `RichHandler` is accessed.
+`rich` is a required runtime dependency (the only one), so it is always available. Rich output is exposed as a **formatter** — `RichFormatter` — not a handler. Attach it to any string-writing handler (`StreamHandler`, `FileHandler`, …) with `handler.set_formatter(RichFormatter())`. See [Rich Console](rich.md).
 
 ## Exception logging
 
@@ -39,7 +41,7 @@ All built-in formatters and handlers understand these fields:
 
 - `TextFormatter` appends traceback and stack blocks after the main log line
 - `JSONFormatter` emits `exception` and `stack_info` keys
-- `RichHandler` prints the main record first, then the traceback and stack output
+- `RichFormatter` renders the main record first, then the traceback and stack output
 
 ## Context-local metadata
 

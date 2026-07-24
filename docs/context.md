@@ -52,8 +52,10 @@ with Context.scope("request", user_id=42):
     logger.fire("handled")          # logfire event attached to the span
 ```
 
-If logfire isn't configured, the span is a no-op and the scope still
-works as a plain bind/reset block.
+`logger.fire(...)` only reaches logfire if a `LogfireHandler` is attached
+to the logger chain (see [Logfire](logfire.md)); it raises `RuntimeError`
+otherwise. If logfire isn't configured, the span is a no-op and the scope
+still works as a plain bind/reset block.
 
 ## Merge behavior
 
