@@ -2,8 +2,7 @@ name: CI
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
   pull_request:
 
 jobs:
@@ -16,8 +15,8 @@ jobs:
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v5
-      - name: uv run --extra dev tox -e lint
-        run: uv run --extra dev tox -e lint
+      - run: uv sync --extra dev
+      - run: uv run ruff check .
 
   test:
     name: Test on Python ${{ matrix.python-version }}
@@ -32,5 +31,5 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v5
-      - name: uv run --extra dev tox -e py
-        run: uv run --extra dev tox -e py
+      - run: uv sync --extra dev
+      - run: uv run pytest -q
